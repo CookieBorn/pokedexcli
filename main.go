@@ -2,7 +2,10 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 )
@@ -28,6 +31,9 @@ func main() {
 	}
 }
 
+var mapNext string
+var mapPrevious any
+
 func cleanInput(text string) []string {
 	textStrip := strings.TrimSpace(text)
 	textStrip = strings.ToLower(textStrip)
@@ -49,11 +55,79 @@ func commandHelp() error {
 	return nil
 }
 
+type Location struct {
+	Count    int    `json:"count"`
+	Next     string `json:"next"`
+	Previous any    `json:"previous"`
+	Results  []struct {
+		Name string `json:"name"`
+		URL  string `json:"url"`
+	} `json:"results"`
+}
+
 func commandMap() error {
+	url := ""
+	if mapNext != "" {
+		url = mapNext
+	} else {
+		url = "https://pokeapi.co/api/v2/location-area/"
+	}
+	res, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("Get error: %v", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		fmt.Printf("Reader error")
+		return fmt.Errorf("Reader error: %v", err)
+	}
+
+	var locations Location
+	if err := json.Unmarshal(body, &locations); err != nil {
+		fmt.Printf("locations error: %v", err)
+		return fmt.Errorf("Unmarshal error: %v", err)
+	}
+	mapNext = locations.Next
+	mapPrevious = locations.Previous
+	for i := 0; i < len(locations.Results); i++ {
+		fmt.Printf("%s\n", locations.Results[i].Name)
+	}
+
 	return nil
 }
 
 func commandMapB() error {
+	url := ""
+	if mapPrevious != nil {
+		url = mapPrevious.(string)
+	} else {
+		fmt.Printf("end of map\n")
+		return nil
+	}
+	res, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("Get error: %v", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		fmt.Printf("Reader error")
+		return fmt.Errorf("Reader error: %v", err)
+	}
+
+	var locations Location
+	if err := json.Unmarshal(body, &locations); err != nil {
+		fmt.Printf("locations error: %v", err)
+		return fmt.Errorf("Unmarshal error: %v", err)
+	}
+	mapNext = locations.Next
+	mapPrevious = locations.Previous
+	for i := 0; i < len(locations.Results); i++ {
+		fmt.Printf("%s\n", locations.Results[i].Name)
+	}
 	return nil
 }
 

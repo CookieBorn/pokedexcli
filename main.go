@@ -8,10 +8,16 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/CookieBorn/pokedexcli/internal/pokecache"
 )
+
+var cache *pokecache.Cache
 
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
+	cache = pokecache.NewCache(5 * time.Second)
 	for true {
 		fmt.Print("Pokedex >")
 		scanner.Scan()
@@ -67,27 +73,36 @@ type Location struct {
 
 func commandMap() error {
 	url := ""
+	var locations Location
 	if mapNext != "" {
 		url = mapNext
 	} else {
 		url = "https://pokeapi.co/api/v2/location-area/"
 	}
-	res, err := http.Get(url)
-	if err != nil {
-		return fmt.Errorf("Get error: %v", err)
-	}
-	defer res.Body.Close()
+	body, ok := cache.Get(url)
+	if ok {
+		if err := json.Unmarshal(body, &locations); err != nil {
+			fmt.Printf("locations error: %v", err)
+			return fmt.Errorf("Unmarshal error: %v", err)
+		}
+	} else {
+		res, err := http.Get(url)
+		if err != nil {
+			return fmt.Errorf("Get error: %v", err)
+		}
+		defer res.Body.Close()
 
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		fmt.Printf("Reader error")
-		return fmt.Errorf("Reader error: %v", err)
-	}
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			fmt.Printf("Reader error")
+			return fmt.Errorf("Reader error: %v", err)
+		}
+		cache.Add(url, body)
 
-	var locations Location
-	if err := json.Unmarshal(body, &locations); err != nil {
-		fmt.Printf("locations error: %v", err)
-		return fmt.Errorf("Unmarshal error: %v", err)
+		if err := json.Unmarshal(body, &locations); err != nil {
+			fmt.Printf("locations error: %v", err)
+			return fmt.Errorf("Unmarshal error: %v", err)
+		}
 	}
 	mapNext = locations.Next
 	mapPrevious = locations.Previous
@@ -100,29 +115,38 @@ func commandMap() error {
 
 func commandMapB() error {
 	url := ""
+	var locations Location
 	if mapPrevious != nil {
 		url = mapPrevious.(string)
+		body, ok := cache.Get(url)
+		if ok {
+			if err := json.Unmarshal(body, &locations); err != nil {
+				fmt.Printf("locations error: %v", err)
+				return fmt.Errorf("Unmarshal error: %v", err)
+			}
+		} else {
+			res, err := http.Get(url)
+			if err != nil {
+				return fmt.Errorf("Get error: %v", err)
+			}
+			defer res.Body.Close()
+
+			body, err := io.ReadAll(res.Body)
+			if err != nil {
+				fmt.Printf("Reader error")
+				return fmt.Errorf("Reader error: %v", err)
+			}
+
+			if err := json.Unmarshal(body, &locations); err != nil {
+				fmt.Printf("locations error: %v", err)
+				return fmt.Errorf("Unmarshal error: %v", err)
+			}
+		}
 	} else {
 		fmt.Printf("end of map\n")
 		return nil
 	}
-	res, err := http.Get(url)
-	if err != nil {
-		return fmt.Errorf("Get error: %v", err)
-	}
-	defer res.Body.Close()
 
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		fmt.Printf("Reader error")
-		return fmt.Errorf("Reader error: %v", err)
-	}
-
-	var locations Location
-	if err := json.Unmarshal(body, &locations); err != nil {
-		fmt.Printf("locations error: %v", err)
-		return fmt.Errorf("Unmarshal error: %v", err)
-	}
 	mapNext = locations.Next
 	mapPrevious = locations.Previous
 	for i := 0; i < len(locations.Results); i++ {

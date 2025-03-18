@@ -229,3 +229,11 @@ func inspect(pokemon string) error {
 	}
 	return nil
 }
+
+func commandPokedex() error {
+	fmt.Print("Pokemon in the Pokedex:\n")
+	for name, _ := range pokedex {
+		fmt.Printf("-%s\n", name)
+	}
+	return nil
+}

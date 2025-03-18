@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -14,10 +15,12 @@ import (
 
 var cache *pokecache.Cache
 var clean []string
+var pokedex map[string]statsPokemon
 
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	cache = pokecache.NewCache(5 * time.Second)
+	pokedex = make(map[string]statsPokemon)
 	for true {
 		fmt.Print("Pokedex >")
 		scanner.Scan()
@@ -145,14 +148,68 @@ func explore(area string) error {
 	} else {
 		body, _ = httphandels.HTTPGet(url)
 		if err := json.Unmarshal(body, &areaPokemon); err != nil {
-			fmt.Printf("locations error: %v", err)
+			fmt.Printf("Incorrect location\n")
 			return fmt.Errorf("Unmarshal error: %v", err)
-			cache.Add(url, body)
 		}
+		cache.Add(url, body)
 		for _, pokemon := range areaPokemon.PokemonEncounters {
 			fmt.Printf("%s\n", pokemon.Pokemon.Name)
 		}
 	}
 
 	return nil
+}
+
+func commandCatch() error {
+	if len(clean) != 1 {
+		catch(clean[1])
+	} else {
+		fmt.Printf("Missing Pokemon\n")
+	}
+	return nil
+}
+
+func catch(pokemon string) error {
+	fmt.Printf("Throwing a Pokeball at %s...\n", pokemon)
+	var pokemonStats statsPokemon
+	url := "https://pokeapi.co/api/v2/pokemon/" + pokemon
+	body, ok := cache.Get(url)
+	if ok {
+		if err := json.Unmarshal(body, &pokemonStats); err != nil {
+			fmt.Printf("locations error: %v\n", err)
+			return fmt.Errorf("Unmarshal error: %v", err)
+		}
+	} else {
+		body, _ = httphandels.HTTPGet(url)
+		if err := json.Unmarshal(body, &pokemonStats); err != nil {
+			fmt.Printf("Incorrect Pokemon\n")
+			return fmt.Errorf("Unmarshal error: %v", err)
+		}
+		cache.Add(url, body)
+	}
+	catchChance := rand.Intn(pokemonStats.BaseExperience)
+	if 100-catchChance > 0 {
+		fmt.Printf("%s was caught!\n", pokemon)
+		pokedex[pokemon] = pokemonStats
+	} else {
+		fmt.Printf("%s escaped!\n", pokemon)
+	}
+	return nil
+}
+
+func commandInspect() error {
+	if len(clean) != 1 {
+		inspect(clean[1])
+	} else {
+		fmt.Printf("Missing Pokemon\n")
+	}
+	return nil
+}
+
+func inspect(pokemon string) error {
+	for name, stats := range pokedex {
+		if name == pokemon {
+			fmt.Printf("Name: %s\n", stats.Name)
+		}
+	}
 }

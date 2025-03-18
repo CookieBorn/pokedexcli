@@ -207,9 +207,25 @@ func commandInspect() error {
 }
 
 func inspect(pokemon string) error {
+	pokeFound := false
 	for name, stats := range pokedex {
 		if name == pokemon {
+			pokeFound = true
 			fmt.Printf("Name: %s\n", stats.Name)
+			fmt.Printf("Height: %v\n", stats.Height)
+			fmt.Printf("Weight: %v\n", stats.Weight)
+			fmt.Print("Stats:\n")
+			for _, stat := range stats.Stats {
+				fmt.Printf("-%s:%v\n", stat.Stat.Name, stat.BaseStat)
+			}
+			fmt.Print("Types:\n")
+			for _, typePoke := range stats.Types {
+				fmt.Printf("-%s\n", typePoke.Type.Name)
+			}
 		}
 	}
+	if pokeFound == false {
+		fmt.Printf("%s not caught yet\n", pokemon)
+	}
+	return nil
 }
